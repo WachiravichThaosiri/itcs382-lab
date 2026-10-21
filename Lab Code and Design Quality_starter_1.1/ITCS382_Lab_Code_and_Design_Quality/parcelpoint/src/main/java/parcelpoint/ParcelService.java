@@ -3,13 +3,12 @@ package parcelpoint;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Collections;
 import java.util.List;
 
 public class ParcelService {
     private List<Locker> lockers = new ArrayList<>();
     private List<Parcel> parcels = new ArrayList<>();
-    private int maxParcels = 100;
 
     public ParcelService() {
         lockers.add(new Locker(1, 1));
@@ -18,14 +17,18 @@ public class ParcelService {
     }
 
     public List<Locker> getLockers() {
-        return lockers;
+        return Collections.unmodifiableList(lockers);
+    }
+
+    public long getFreeLockerCount() {
+        return lockers.stream().filter(Locker::isFree).count();
     }
 
     public Locker storeParcel(Parcel parcel) {
         for (Locker locker : lockers) {
             if (locker.isFree() && locker.getSize() >= parcel.getSize()) {
                 locker.setParcel(parcel);
-                parcel.status = "STORED";
+                parcel.setStatus("STORED");
                 parcels.add(parcel);
                 System.out.println("SMS to " + parcel.getStudentId() + ": parcel "
                         + parcel.getCode() + " is in locker " + locker.getNumber());
@@ -39,9 +42,9 @@ public class ParcelService {
     public double pickUp(String code, int days) {
         for (Locker locker : lockers) {
             Parcel parcel = locker.getParcel();
-            if (parcel != null && parcel.getCode() == code) {
+            if (parcel != null && parcel.getCode().equals(code)) {
                 locker.setParcel(null);
-                parcel.status = "PICKED_UP";
+                parcel.setStatus("PICKED_UP");
                 saveToFile();
                 return fee(parcel, days);
             }
@@ -50,34 +53,33 @@ public class ParcelService {
     }
 
     public double fee(Parcel parcel, int days) {
-        if (days <= 3) {
-            return 0;
-        }
-        if (parcel.getSize() == 1) {
-            return (days - 3) * 10.0;
-        } else if (parcel.getSize() == 2) {
-            return (days - 3) * 15.0;
-        }
+        if (days <= 3) return 0;
+        if (parcel.getSize() == 1) return (days - 3) * 10.0;
+        if (parcel.getSize() == 2) return (days - 3) * 15.0;
         return (days - 3) * 20.0;
     }
 
-    public void printParcels(boolean forStaff) {
+    public void printStoredParcels() {
         for (Parcel parcel : parcels) {
-            if (forStaff) {
-                System.out.println(parcel.getCode() + " " + parcel.getStudentId() + " " + parcel.status);
-            } else if (parcel.status.equals("STORED")) {
+            if (parcel.getStatus().equals("STORED")) {
                 System.out.println(parcel.getCode() + " is waiting");
             }
         }
     }
 
+    public void printParcelsForStaff() {
+        for (Parcel parcel : parcels) {
+            System.out.println(parcel.getCode() + " " + parcel.getStudentId() + " " + parcel.getStatus());
+        }
+    }
+
     private void saveToFile() {
-        try {
-            FileWriter writer = new FileWriter("parcels.csv");
+        try (FileWriter writer = new FileWriter("parcels.csv")) {
             for (Parcel parcel : parcels) {
-                writer.write(parcel.getCode() + "," + parcel.status + "\n");
+                writer.write(parcel.getCode() + "," + parcel.getStatus() + "\n");
             }
         } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
